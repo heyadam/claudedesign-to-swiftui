@@ -61,7 +61,7 @@ import SwiftUI
 //   Newsreader        → .system(design: .serif)       (used for headlines)
 //   Geist             → .system(design: .default)
 //   Geist Mono        → .system(design: .monospaced)
-// To use the original fonts, see references/font-mapping.md "Custom font registration".
+// To use the originals, see references/font-mapping.md "Original-font fidelity".
 ```
 
 This makes the mapping discoverable and lets the user override per-font without reading the skill source.
@@ -75,18 +75,37 @@ Text("Hello")
     .font(.system(size: 20, weight: .semibold, design: .serif))   // Newsreader-Semibold 20px
 ```
 
-## Custom font registration (opt-in, off by default)
+## Original-font fidelity (manual user steps)
 
-Most users won't want their bundle to grow by 8 font families just to match the prototype exactly. The skill defaults to system mapping. If the user explicitly asks for original fonts ("use the actual fonts", "register the Google Fonts", etc.), do this for each family:
+The Xcode 26.3 MCP (`xcrun mcpbridge`) does not expose tools for adding files to `.xcodeproj` build phases or for editing `Info.plist`. Custom-font registration cannot be automated through this skill.
 
-1. Determine the variants used in the prototype (parse the URL: `family=Newsreader:wght@400;600` → 400 + 600 weights).
-2. For each variant, derive the Google Fonts download URL (or use `curl https://fonts.googleapis.com/css2?...` to get the @font-face CSS, then download each `src: url(...)` `.ttf`/`.woff2`).
-3. Save the font files to a temp dir on disk.
-4. Use `mcp__xcode-tools__XcodeInsertFile` for each font, targeting a `Fonts/` group inside the main app target. Capture the inserted paths.
-5. Use `mcp__xcode-tools__AddInfoPlist` with key `UIAppFonts` and value `["Newsreader-Regular.ttf", "Newsreader-SemiBold.ttf", ...]` (an array of filenames).
-6. Replace `.font(.system(...))` calls with `.font(.custom("Newsreader-Regular", size: ...))` (use the PostScript name, not the filename — typically `<Family>-<Weight>` without spaces).
+If the user explicitly asks for original fonts ("use the actual fonts", "register the Google Fonts", etc.), still emit `.font(.custom("PostScriptName", size:))` calls in the generated SwiftUI — but **also** emit a top-of-file `// MARK: - Manual font setup required` comment block listing the steps the user must do in Xcode by hand:
 
-After registering, also update the top-of-file fonts comment to indicate the originals are now bundled.
+```swift
+// MARK: - Manual font setup required
+// This view uses .font(.custom(...)) for the original Google Font families.
+// To make those fonts available, you must:
+//   1. Download the .ttf files from fonts.google.com for each family + weight used below.
+//   2. Drag the .ttf files into your Xcode target (check "Copy items if needed" and target membership).
+//   3. Open the target's Info.plist and add a "Fonts provided by application" (UIAppFonts) array
+//      with each filename, e.g. ["Newsreader-Regular.ttf", "Newsreader-SemiBold.ttf", ...].
+//   4. The PostScript name used in .font(.custom(...)) below is typically <Family>-<Weight>
+//      without spaces (verify in Font Book if a font doesn't load).
+```
+
+Then list each `.font(.custom(...))` call's PostScript name in a comment so the user can match them to downloads:
+
+```swift
+// Custom fonts referenced:
+//   Newsreader-Regular     (Newsreader 400)
+//   Newsreader-SemiBold    (Newsreader 600)
+//   Geist-Regular          (Geist 400)
+//   GeistMono-Regular      (Geist Mono 400)
+```
+
+This still beats v0.2.x (which silently swapped to system fonts and never told the user). The user gets working SwiftUI plus a copy-pasteable checklist.
+
+Until/unless a future MCP version adds project-mutation tools (or this plugin gains an out-of-band path via AppleScript / `project.pbxproj` editing), this is the boundary.
 
 ## Notes on weight matching
 

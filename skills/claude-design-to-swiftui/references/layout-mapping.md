@@ -13,6 +13,7 @@ Lookup table for translating layout containers. Apply the first row whose CSS pa
 | `display: block` with stacked children        | `VStack(alignment: .leading, spacing: 0)`            | Block is the default — most `<div>` containers.    |
 | `display: inline-block` siblings              | `HStack(spacing: 0)`                                 |                                                    |
 | `position: absolute` overlay on parent        | `ZStack(alignment: ...)`                             | Map `top/left` offsets via `.offset(x:y:)`.        |
+| `position: absolute` small decoration on a single element (e.g. a degree symbol after a number, a badge dot on an icon) | `.overlay(alignment:) { decoration.offset(...) }` on the parent element | Don't use `HStack` + `.kerning()` — kerning won't reproduce absolute pixel offsets, and an `HStack` adds layout that the original didn't have. `.overlay` lets the decoration float in its own coordinate space without affecting the parent's intrinsic size. |
 | `overflow: auto` / `overflow-y: scroll`       | `ScrollView(.vertical)`                              | Use `.horizontal` for `overflow-x`.                |
 | `<ul>` / `<ol>` of repeated rows              | `List { ForEach(...) { ... } }` or `ScrollView+VStack` | Use `List` for native row styling; `VStack` for custom. |
 

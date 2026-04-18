@@ -75,7 +75,7 @@ Walk the DOM top-down using the reference mappings (loaded on demand):
 For the assets inventoried in step 3, run them through these handlers:
 
 - **Inline SVGs** → first try `references/svg-to-sfsymbol.md` (curated SF Symbol map). On miss, fall back to `references/svg-path-translation.md` (emit a `fileprivate struct FooIcon: View` with a hand-translated `Path`).
-- **Google Fonts** → `references/font-mapping.md`. Default behavior: map each detected family to its closest SwiftUI system equivalent and emit a `// Fonts detected in prototype` comment block at the top of the file. Only register the actual `.ttf` files (via `XcodeInsertFile` + `AddInfoPlist`) if the user explicitly asks for original-font fidelity.
+- **Google Fonts** → `references/font-mapping.md`. Default behavior: map each detected family to its closest SwiftUI system equivalent and emit a `// Fonts detected in prototype` comment block at the top of the file. Original-font fidelity requires manual user steps (download `.ttf`, drag into Xcode, edit `Info.plist` `UIAppFonts`) — the Xcode 26.3 MCP exposes no tools for project-file or Info.plist mutation; see the "Original-font fidelity" section in `references/font-mapping.md` for the recipe to hand the user.
 - **`<img>` tags / CSS `background-image`** → `references/asset-catalog-import.md`. Local files get imported into `Assets.xcassets/<name>.imageset/`; external URLs become `AsyncImage`.
 
 When unsure how a chunk maps, see `examples/01-landing-card/` and `examples/02-list-with-rows/` for end-to-end before/after pairs.
@@ -89,9 +89,9 @@ Translation rules:
 
 ### 5. Locate the Xcode workspace and write the file
 
-1. Call `mcp__xcode-tools__XcodeListWindows` to find the open workspace and its on-disk root path.
+1. Call `mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeListWindows` to find the open workspace and its on-disk root path.
 2. Pick a meaningful filename based on the prototype's purpose (e.g., `OnboardingView.swift`, `SettingsListView.swift`). If multiple workspace folders exist, ask the user which target group to write into. If only one obvious group exists, write there.
-3. Call `mcp__xcode-tools__XcodeWrite` with the chosen path and the generated SwiftUI source.
+3. Call `mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeWrite` with the chosen path and the generated SwiftUI source.
 
 Required file structure:
 
@@ -124,25 +124,41 @@ The file must compile standalone — no external packages, no references to type
 
 ### 6. Build and fix until clean
 
-1. Call `mcp__xcode-tools__BuildProject` for the active scheme.
+1. Call `mcp__plugin_claudedesign-to-swiftui_xcode-tools__BuildProject` for the active scheme.
 2. If errors:
-   - Call `mcp__xcode-tools__XcodeListNavigatorIssues` to read structured diagnostics.
-   - Patch the file with `mcp__xcode-tools__XcodeUpdate`.
+   - Call `mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeListNavigatorIssues` to read structured diagnostics.
+   - **Before patching**, check `references/swiftui-gotchas.md` — most build failures here (expression-too-complex, `ForEach` Identifiable, `Color(hex:)` not found, `foregroundColor` vs `foregroundStyle`, etc.) have a known fix that's faster than diagnosing from the raw error.
+   - Patch the file with `mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeUpdate`.
    - Re-run `BuildProject`.
    - Loop. If the same error recurs after two patch attempts, surface it to the user with the diagnostic and your interpretation.
 3. Continue once the build succeeds.
 
 ### 7. Render the SwiftUI preview and visually diff
 
-1. Call `mcp__xcode-tools__RenderPreview` for the file you just wrote — it returns the actual rendered preview as an image.
+**For tall designs** (anything that scrolls past 844pt — long landing pages, settings screens with many rows, dashboards with multiple cards): before calling `RenderPreview`, modify the `#Preview { ... }` block to force a frame tall enough to capture the whole layout, otherwise the preview only renders the iPhone viewport's top ~844pt and below-the-fold content goes un-diff'd:
+
+```swift
+#Preview {
+    MeaningfulName()
+        .previewLayout(.sizeThatFits)
+        .frame(width: 390, height: 1800)   // estimate from prototype screenshot height
+}
+```
+
+Pick the height by eyeballing the prototype screenshot from step 2 (use the rendered HTML's full document height, not the 844 viewport). Better to overshoot — the preview will whitespace-pad the bottom but at least nothing is hidden.
+
+For single-screen designs (≤ 844pt), skip this — the default preview is fine.
+
+1. Call `mcp__plugin_claudedesign-to-swiftui_xcode-tools__RenderPreview` for the file you just wrote — it returns the actual rendered preview as an image.
 2. Compare against the prototype screenshot from step 2:
    - Layout: containers in the right positions, with the right spacing?
    - Sizing: widths/heights/proportions correct?
    - Colors: backgrounds/text/borders match?
    - Typography: font sizes/weights look right?
    - Iconography & images: placeholders in roughly the right spots?
+   - **Below-the-fold content present?** If you didn't extend the preview frame and the prototype is taller than 844pt, explicitly tell the user "preview only verified the top viewport — below-the-fold content (X, Y, Z) was generated but not auto-diff'd."
 3. Produce a concrete list of discrepancies with proposed patches (specific line edits, not vague "make it more X").
-4. Apply patches via `mcp__xcode-tools__XcodeUpdate`, then go back to step 6 (build) → step 7 (re-render).
+4. Apply patches via `mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeUpdate`, then go back to step 6 (build) → step 7 (re-render).
 5. Loop until the diff is acceptable. After three iterations without convergence, stop and present the remaining diff to the user.
 
 When done, show the user: the prototype screenshot, the final preview screenshot, and the path to the file you wrote.

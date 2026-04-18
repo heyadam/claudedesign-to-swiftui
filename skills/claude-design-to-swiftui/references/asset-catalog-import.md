@@ -24,7 +24,7 @@ For every `<img src>` whose `src` resolves to a file under the unpack directory 
 Find the project's primary asset catalog:
 
 ```
-mcp__xcode-tools__XcodeGlob: pattern = "**/*.xcassets"
+mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeGlob: pattern = "**/*.xcassets"
 ```
 
 - **No catalog**: skip import. Emit `Image("\(name)")` with `// TODO: no Assets.xcassets in project — add the catalog and import \(filename) manually` and stop.
@@ -34,13 +34,13 @@ mcp__xcode-tools__XcodeGlob: pattern = "**/*.xcassets"
 Create the imageset directory:
 
 ```
-mcp__xcode-tools__XcodeMakeDir: path = "<catalog>/<assetName>.imageset"
+mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeMakeDir: path = "<catalog>/<assetName>.imageset"
 ```
 
 Write the `Contents.json`:
 
 ```
-mcp__xcode-tools__XcodeWrite:
+mcp__plugin_claudedesign-to-swiftui_xcode-tools__XcodeWrite:
   path: "<catalog>/<assetName>.imageset/Contents.json"
   content: |
     {
@@ -72,7 +72,7 @@ Copy the binary file (XcodeWrite is text-only — must use shell):
 cp "<src-absolute-path>" "<catalog>/<assetName>.imageset/<originalFilename>"
 ```
 
-Don't bother with `XcodeInsertFile` here — files inside `.xcassets` are picked up by Xcode's folder reference automatically; no individual project registration is needed.
+Files inside `.xcassets` are picked up by Xcode's folder reference automatically — no individual project registration is needed (which is good, because the Xcode 26.3 MCP exposes no project-mutation tools anyway).
 
 ## Multi-resolution (1x/2x/3x)
 

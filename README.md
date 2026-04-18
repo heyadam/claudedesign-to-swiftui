@@ -6,15 +6,15 @@ One prototype in, one self-contained `.swift` file out.
 
 ## What it does, end to end
 
-1. **Fetches** the design (URL or tarball) and unpacks it.
-2. **Renders** the HTML in Chrome at iPhone 15 Pro size (390×844) and screenshots it.
-3. **Reads** the HTML + every linked CSS file.
-4. **Translates** the DOM and styles to SwiftUI using bundled reference mappings (layout, typography, styling, component patterns) plus two worked examples.
-5. **Writes** the generated file into your open Xcode workspace (via Apple's native Xcode MCP).
+1. **Fetches** the design (URL or tarball), unpacks it, and serves it locally over `http://127.0.0.1:<port>` (Claude designs commonly use ES modules and `fetch()`, which fail under `file://`).
+2. **Renders** the prototype in Chrome at iPhone 15 Pro size (390×844) and screenshots it.
+3. **Reads** the HTML + every linked CSS file, and inventories assets (inline SVGs, Google Fonts, `<img>` tags).
+4. **Translates** the DOM and styles to SwiftUI using bundled reference mappings (layout, typography, styling, component patterns, plus three asset handlers: SVG → SF Symbol or `Path`, Google Fonts → SF system equivalents, `<img>` → `Assets.xcassets` import or `AsyncImage`) and two worked examples.
+5. **Writes** the generated file into your open Xcode workspace (via Apple's Xcode 26.3 MCP).
 6. **Builds** the project and patches any errors from the navigator diagnostics.
 7. **Renders** the SwiftUI preview and **visually diffs** it against the prototype screenshot, iterating until they match.
 
-Output is a **single `.swift` file**: one `View` struct + a `#Preview` + (if needed) a `fileprivate` `Color(hex:)` extension. No external packages, no multi-screen navigation, no JS interactivity — visual layout fidelity only.
+Output is a **single `.swift` file**: one `View` struct + a `#Preview` + (if used) a `fileprivate` `Color(hex:)` extension and one `fileprivate struct FooIcon: View` per custom SVG icon. No external packages, no multi-screen navigation, no JS interactivity — visual layout fidelity only.
 
 ## Requirements
 
@@ -34,13 +34,6 @@ If either MCP is missing, the skill degrades gracefully: it'll emit the `.swift`
 ```
 /plugin marketplace add heyadam/claudedesign-to-swiftui
 /plugin install claudedesign-to-swiftui@claudedesign-to-swiftui
-```
-
-Replace `heyadam` with the GitHub owner of the repo (e.g. `adampresson`).
-
-To install a specific version, tag it in git and reference the tag:
-```
-/plugin marketplace add heyadam/claudedesign-to-swiftui@v0.1.0
 ```
 
 ### Verify the install
@@ -80,20 +73,28 @@ Running `/convert` with no argument will prompt you for a URL or path.
 
 - **Command** — `/convert` (`commands/convert.md`): the entry point; orchestrates the skill.
 - **Skill** — `claude-design-to-swiftui` (`skills/claude-design-to-swiftui/SKILL.md`): the full workflow.
-  - `scripts/fetch.sh` — download + unpack + entry-HTML resolution.
+  - `scripts/fetch.sh` — download, unpack, start a localhost-bound `python3 -m http.server` on a free port, and print URL + PID + dir.
+  - `scripts/stop.sh` — kill the local server and remove the unpack dir at end of run.
   - `references/layout-mapping.md` — flex / grid / block → `VStack` / `HStack` / `ZStack` / `Grid` / `ScrollView`.
   - `references/styling-mapping.md` — CSS padding / background / border / shadow → SwiftUI modifiers.
   - `references/typography-mapping.md` — font-family / size / weight → `.font()` / `.fontWeight()` / `.lineSpacing()`.
   - `references/component-patterns.md` — cards, buttons, list rows, nav bars.
+  - `references/svg-to-sfsymbol.md` — curated visual fingerprints for ~30 common UI icons → SF Symbol names.
+  - `references/svg-path-translation.md` — SVG path commands → SwiftUI `Path` builder; the fallback when no SF Symbol matches.
+  - `references/font-mapping.md` — Google Font families (Newsreader, Geist, Fraunces, IBM Plex…) → SF system equivalents, plus a manual recipe for original-font fidelity.
+  - `references/asset-catalog-import.md` — local `<img>` files → `Assets.xcassets/<name>.imageset/`; CDN URLs → `AsyncImage`.
+  - `references/swiftui-gotchas.md` — known SwiftUI compile pitfalls (expression-too-complex, `ForEach` Identifiable, `Color(hex:)`, etc.) and their fixes.
   - `examples/01-landing-card/` and `examples/02-list-with-rows/` — before/after HTML → SwiftUI pairs.
-- **MCP bundle** — `.mcp.json` registers the `xcode-tools` server automatically when the plugin is installed.
+- **MCP bundle** — `.mcp.json` registers the `xcode-tools` server automatically when the plugin is installed. Tools register under the namespace `mcp__plugin_claudedesign-to-swiftui_xcode-tools__*` (Claude Code's plugin-MCP convention).
 
 ## Translation rules at a glance
 
 - Preserve DOM hierarchy — a wrapping `<div>` becomes a wrapping `VStack` (or the container that fits).
 - Inline literal pixel values (`padding: 16px` → `.padding(16)`). No design tokens in v1.
 - Hex colors go through a `fileprivate extension Color { init(hex:) }` at the bottom of the file.
-- SF Symbols (`Image(systemName:)`) only when the prototype has an unambiguous iconographic glyph. Otherwise `Image("...")` with a `// TODO: add asset` comment.
+- **Inline `<svg>` icons** — first try the curated SF Symbol map (`Image(systemName:)`). On miss, fall back to a `fileprivate struct FooIcon: View` with a translated `Path`.
+- **Google Fonts** — mapped to closest SF system family (e.g. Newsreader → `.system(.body, design: .serif)`); a top-of-file comment lists what got mapped. Original fonts require manual user setup (the Xcode 26.3 MCP can't register fonts).
+- **`<img>` tags** — local files import into `Assets.xcassets/<name>.imageset/`; external URLs become `AsyncImage`.
 - Content taller than 844pt → wrapped in `ScrollView`.
 
 ## Scope and non-goals
@@ -101,13 +102,14 @@ Running `/convert` with no argument will prompt you for a URL or path.
 **In scope**
 - One HTML prototype → one SwiftUI `View` file.
 - Visual layout fidelity (structure, spacing, color, type, placement).
+- Asset handling: inline SVGs (SF Symbol or `Path`), Google Fonts (system mapping), local `<img>` import to `.xcassets`, CDN images via `AsyncImage`.
 - Automatic build + preview + diff loop.
 
 **Out of scope**
 - Multi-screen navigation flows, full app scaffolds.
 - Prototypes whose value is JS behavior (animations, drag/drop, state machines).
 - Figma, Sketch, or screenshot-only inputs (HTML source required).
-- Asset extraction (images/fonts) — placeholders only.
+- Custom-font registration (downloading `.ttf` files into the project + editing `Info.plist`) — the Xcode 26.3 MCP doesn't expose tools for `.xcodeproj` or `Info.plist` mutation, so the skill emits a manual checklist for the user instead.
 
 ## Troubleshooting
 
@@ -115,8 +117,10 @@ Running `/convert` with no argument will prompt you for a URL or path.
 |---|---|---|
 | `xcrun mcpbridge` not found | Xcode < 26.3 | Update Xcode, or let the skill fall back to `Write` + manual preview. |
 | Tools disabled / no workspace found | Xcode Tools off, or project not open | Settings → Intelligence → **Xcode Tools = ON**, then open your project. |
+| `tool not found: mcp__xcode-tools__...` errors | Stale install referencing the pre-v0.3.1 bare prefix | Uninstall + reinstall. Plugin-bundled MCPs register under `mcp__plugin_claudedesign-to-swiftui_xcode-tools__*`; v0.3.0 and earlier referenced the wrong prefix. |
 | Design URL returns 404 | URL was short-lived / already consumed | Ask Claude to regenerate the design and run `/convert` with the fresh URL. |
 | Chrome render step skipped | `claude-in-chrome` MCP not installed | Install it, or run in degraded mode (paste a screenshot back manually). |
+| Custom font in prototype renders as system font | Default behavior — system mapping | Ask "use the actual fonts" and the skill will emit `.font(.custom(...))` plus a manual setup checklist. |
 | Preview doesn't match after 3 iterations | Layout edge case not covered by the reference mappings | The skill will stop and show the remaining diff — patch by hand from there. |
 
 ## Uninstall
