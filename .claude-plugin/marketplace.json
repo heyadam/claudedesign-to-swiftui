@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "claudedesign-to-swiftui",
-      "source": ".",
+      "source": "./",
       "description": "Convert Claude-generated HTML design prototypes (URL or .tar.gz) into SwiftUI View files."
     }
   ]
