@@ -7,7 +7,7 @@ description: This skill should be used when the user asks to "convert a Claude d
 
 This skill converts a Claude-generated HTML/CSS prototype (delivered as a design URL from `api.anthropic.com/v1/design/h/...`, or a local `.tar.gz` archive) into a single SwiftUI View file inside the user's active Xcode workspace.
 
-The output is **one self-contained `.swift` file**: one `View` struct + a `#Preview`. No multi-screen navigation, no JS interactivity, no asset extraction — visual layout fidelity only.
+The output is **one self-contained `.swift` file**: one `View` struct + a `#Preview`, plus inline `Path`-based icons and any imported image assets. No multi-screen navigation and no JS interactivity — visual layout fidelity only.
 
 ## Required MCP servers
 
@@ -46,7 +46,7 @@ Use `claude-in-chrome` to render the prototype at iPhone-class viewport:
 
 Keep this screenshot — the **prototype reference** for step 7's diff loop.
 
-### 3. Read the HTML/CSS source
+### 3. Read the HTML/CSS source and inventory assets
 
 Read the entry HTML and every linked stylesheet (`<link rel="stylesheet">`) and inline `<style>` block. Build a mental model of:
 
@@ -54,7 +54,14 @@ Read the entry HTML and every linked stylesheet (`<link rel="stylesheet">`) and 
 - The styles applied to each container (layout mode, spacing, colors, typography, borders, shadows)
 - Repeated patterns that should become reusable subviews
 
-Skip `<script>` tags — JS behavior is out of scope.
+Also do an asset inventory pass (used in step 4):
+
+- **Inline `<svg>` elements** — collect the unique ones (after whitespace normalization). Most Claude designs put icons inline this way.
+- **Google Fonts** — parse any `<link href="https://fonts.googleapis.com/css2?family=..."`. The `&family=` segments give the font families (URL-decode `+` to space).
+- **`<img>` tags** — separate into local paths (relative to the entry HTML) vs external URLs (`http://`/`https://`).
+- **Background images** in CSS (`background-image: url(...)`) — same separation as `<img>`.
+
+Skip `<script>` tags — JS behavior is out of scope. (For React/JSX prototypes, the JSX `iconSvg` map and component tree are still the source of truth for what gets rendered — read them like a description of the DOM.)
 
 ### 4. Translate to SwiftUI
 
@@ -65,13 +72,19 @@ Walk the DOM top-down using the reference mappings (loaded on demand):
 - **Typography** → `references/typography-mapping.md` (font-family/size/weight → `.font()` / `.fontWeight()` / `.lineSpacing()`)
 - **Common patterns** (cards, buttons, list rows, nav bars) → `references/component-patterns.md`
 
+For the assets inventoried in step 3, run them through these handlers:
+
+- **Inline SVGs** → first try `references/svg-to-sfsymbol.md` (curated SF Symbol map). On miss, fall back to `references/svg-path-translation.md` (emit a `fileprivate struct FooIcon: View` with a hand-translated `Path`).
+- **Google Fonts** → `references/font-mapping.md`. Default behavior: map each detected family to its closest SwiftUI system equivalent and emit a `// Fonts detected in prototype` comment block at the top of the file. Only register the actual `.ttf` files (via `XcodeInsertFile` + `AddInfoPlist`) if the user explicitly asks for original-font fidelity.
+- **`<img>` tags / CSS `background-image`** → `references/asset-catalog-import.md`. Local files get imported into `Assets.xcassets/<name>.imageset/`; external URLs become `AsyncImage`.
+
 When unsure how a chunk maps, see `examples/01-landing-card/` and `examples/02-list-with-rows/` for end-to-end before/after pairs.
 
 Translation rules:
 - Preserve hierarchy — wrapping `<div>` becomes a wrapping `VStack` (or whatever container fits).
 - Inline literal pixel values (`padding: 16px` → `.padding(16)`); don't abstract into design tokens for v1.
 - Use `Color(hex:)` from a **`fileprivate extension Color`** at the bottom of the file (so it doesn't collide with helpers in the user's project).
-- `Image(systemName: ...)` only when the prototype has a clear iconographic glyph; otherwise `Image("placeholder-name")` with a `// TODO: add asset` comment.
+- Custom `Path`-based icons go next to the `Color` extension as additional `fileprivate struct FooIcon: View` declarations. Reuse one struct across multiple usage sites of the same SVG.
 - Wrap in `ScrollView` if content is taller than 844pt.
 
 ### 5. Locate the Xcode workspace and write the file
@@ -85,6 +98,10 @@ Required file structure:
 ```swift
 import SwiftUI
 
+// Fonts detected in prototype (mapped to SF equivalents):    ← only when Google Fonts detected
+//   Newsreader  → .system(design: .serif)
+//   Geist Mono  → .system(design: .monospaced)
+
 struct MeaningfulName: View {
     var body: some View {
         // ...translated layout...
@@ -95,7 +112,9 @@ struct MeaningfulName: View {
     MeaningfulName()
 }
 
-// At file bottom, only if any hex colors are used:
+// At file bottom, in this order, each only if used:
+//   1. fileprivate extension Color { init(hex: String) ... }   ← if any hex colors
+//   2. fileprivate struct FooIcon: View { ... Path { ... } }   ← one per unique custom SVG
 fileprivate extension Color {
     init(hex: String) { /* ... */ }
 }
