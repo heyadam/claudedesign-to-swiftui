@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
-# Fetch a Claude design archive and print the entry HTML path on stdout.
+# Fetch a Claude design archive, unpack it, start a local HTTP server, and
+# print server connection details on stdout.
+#
+# Output on success (3 lines):
+#   line 1: URL to the entry HTML (e.g. http://127.0.0.1:51234/index.html)
+#   line 2: server PID (pass to stop.sh for cleanup)
+#   line 3: unpack directory (pass to stop.sh for cleanup)
 #
 # Accepts either:
 #   - an https://api.anthropic.com/v1/design/h/<id>?open_file=<name> URL
 #   - a local path to a .tar.gz archive
 #
-# If the URL has an ?open_file=... query param, that filename (URL-decoded) is
-# used as the entry HTML hint. Otherwise (or for local paths) the script falls
-# back to: first index.html, else first *.html.
+# A local HTTP server is required because Claude designs commonly use ES
+# modules, fetch(), and other web APIs that fail under file:// origins.
 #
-# Exit codes: 0 success, 1 usage error, 2 archive missing/invalid, 3 no HTML inside.
+# Exit codes: 0 success, 1 usage error, 2 archive missing/invalid,
+# 3 no HTML inside, 4 server failed to start.
 
 set -euo pipefail
 
@@ -76,4 +82,31 @@ if [ -z "$entry" ]; then
   exit 3
 fi
 
-echo "$entry"
+relpath="${entry#$tmpdir/}"
+
+port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
+
+nohup python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmpdir" \
+  >"$tmpdir/.server.log" 2>&1 &
+server_pid=$!
+disown "$server_pid" 2>/dev/null || true
+
+ready=0
+for _ in $(seq 1 50); do
+  if curl -sf "http://127.0.0.1:$port/" >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  sleep 0.1
+done
+
+if [ "$ready" -ne 1 ]; then
+  kill "$server_pid" 2>/dev/null || true
+  echo "server failed to start on port $port (see $tmpdir/.server.log)" >&2
+  rm -rf "$tmpdir"
+  exit 4
+fi
+
+echo "http://127.0.0.1:$port/$relpath"
+echo "$server_pid"
+echo "$tmpdir"

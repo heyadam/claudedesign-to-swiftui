@@ -1,6 +1,6 @@
 {
   "name": "claudedesign-to-swiftui",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Convert Claude-generated HTML design prototypes (URL or .tar.gz) into SwiftUI View files.",
   "author": {
     "name": "Adam Presson",

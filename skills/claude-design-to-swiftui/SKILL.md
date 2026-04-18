@@ -20,13 +20,19 @@ This skill calls into two MCP servers. If either is missing, stop and tell the u
 
 Follow these steps in order. Do not skip the build or visual-diff steps.
 
-### 1. Fetch the design
+### 1. Fetch the design and start a local server
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/claude-design-to-swiftui/scripts/fetch.sh" <design-url-or-tarball-path>
 ```
 
-Accepts either a Claude design URL (`https://api.anthropic.com/v1/design/h/<id>?open_file=<name>`) or a local `.tar.gz` path. The script downloads (if needed), unpacks to a temp directory, and prints the **entry HTML path** on stdout. Entry resolution: URL-decoded `open_file=` query param → `index.html` → first `*.html`. Capture the printed path.
+Accepts either a Claude design URL (`https://api.anthropic.com/v1/design/h/<id>?open_file=<name>`) or a local `.tar.gz` path. The script downloads (if needed), unpacks to a temp directory, starts a localhost-bound `python3 -m http.server` on a free port, and prints **three lines** on stdout:
+
+1. The **URL** to the entry HTML (e.g. `http://127.0.0.1:51234/index.html`)
+2. The server **PID** (capture for cleanup in step 8)
+3. The unpack **directory** (capture for cleanup in step 8)
+
+Entry resolution: URL-decoded `open_file=` query param → `index.html` → first `*.html`. The local server is required because Claude designs commonly use ES modules / `fetch()` which fail under `file://` origins.
 
 Note: design URLs are one-shot/short-lived. Fetch immediately; if it 404s, ask the user for a fresh URL.
 
@@ -34,7 +40,7 @@ Note: design URLs are one-shot/short-lived. Fetch immediately; if it 404s, ask t
 
 Use `claude-in-chrome` to render the prototype at iPhone-class viewport:
 
-1. `mcp__claude-in-chrome__tabs_create_mcp` → open `file://<entry-html-path>`.
+1. `mcp__claude-in-chrome__tabs_create_mcp` → open the **URL** from step 1 (do not use `file://`).
 2. `mcp__claude-in-chrome__resize_window` → 390x844 (iPhone 15 Pro logical size).
 3. `mcp__claude-in-chrome__computer` (screenshot action) → capture the rendered page.
 
@@ -121,6 +127,14 @@ The file must compile standalone — no external packages, no references to type
 5. Loop until the diff is acceptable. After three iterations without convergence, stop and present the remaining diff to the user.
 
 When done, show the user: the prototype screenshot, the final preview screenshot, and the path to the file you wrote.
+
+### 8. Stop the local server and clean up
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/claude-design-to-swiftui/scripts/stop.sh" <pid> <dir>
+```
+
+Pass the PID and directory captured in step 1. This kills the `http.server` process and removes the unpack directory. Always run this even if earlier steps failed.
 
 ## Fallback when MCP servers are unavailable
 
