@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Settings</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #F2F2F7;
+    color: #1C1C1E;
+  }
+  header {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0 16px;
+    background: #F2F2F7;
+  }
+  header .back {
+    position: absolute;
+    left: 16px;
+    font-size: 17px;
+    color: #007AFF;
+    font-weight: 600;
+  }
+  header h1 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+  ul.list {
+    list-style: none;
+    background: white;
+    margin: 16px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  ul.list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #E5E5EA;
+  }
+  ul.list li:last-child { border-bottom: none; }
+  ul.list li .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #007AFF;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  ul.list li .label {
+    flex: 1;
+    font-size: 16px;
+  }
+  ul.list li .value {
+    font-size: 15px;
+    color: #6B6B70;
+  }
+  ul.list li .chevron {
+    color: #C7C7CC;
+    font-size: 14px;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <span class="back">&lsaquo; Back</span>
+    <h1>Settings</h1>
+  </header>
+  <ul class="list">
+    <li>
+      <div class="icon">A</div>
+      <span class="label">Account</span>
+      <span class="value">adam@example.com</span>
+      <span class="chevron">&rsaquo;</span>
+    </li>
+    <li>
+      <div class="icon" style="background:#34C759">N</div>
+      <span class="label">Notifications</span>
+      <span class="value">On</span>
+      <span class="chevron">&rsaquo;</span>
+    </li>
+    <li>
+      <div class="icon" style="background:#FF9500">P</div>
+      <span class="label">Privacy</span>
+      <span class="chevron">&rsaquo;</span>
+    </li>
+    <li>
+      <div class="icon" style="background:#AF52DE">H</div>
+      <span class="label">Help</span>
+      <span class="chevron">&rsaquo;</span>
+    </li>
+  </ul>
+</body>
+</html>

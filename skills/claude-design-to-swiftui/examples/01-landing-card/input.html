@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Welcome</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #F2F2F7;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #007AFF, #5856D6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1C1C1E;
+  }
+  p {
+    font-size: 15px;
+    color: #6B6B70;
+    line-height: 1.5;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #007AFF;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn.secondary {
+    background: transparent;
+    color: #007AFF;
+    border: 1px solid #007AFF;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">A</div>
+    <h1>Welcome to Acme</h1>
+    <p>Get started in seconds. Connect your account and we'll handle the rest.</p>
+    <button class="btn">Get Started</button>
+    <button class="btn secondary">I already have an account</button>
+  </div>
+</body>
+</html>

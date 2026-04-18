@@ -1,0 +1,14 @@
+{
+  "name": "claudedesign-to-swiftui",
+  "owner": {
+    "name": "Adam Presson",
+    "email": "me@heyadam.com"
+  },
+  "plugins": [
+    {
+      "name": "claudedesign-to-swiftui",
+      "source": ".",
+      "description": "Convert Claude-generated HTML design prototypes (URL or .tar.gz) into SwiftUI View files."
+    }
+  ]
+}
